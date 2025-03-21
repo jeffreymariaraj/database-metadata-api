@@ -1,0 +1,39 @@
+name: FastAPI Database Metadata API
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install flake8 pytest
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Create test database
+      run: |
+        sqlite3 test_db.sqlite < schema.sql
+    - name: Test API startup
+      run: |
+        echo "DATABASE_URL=sqlite+aiosqlite:///./test_db.sqlite" > .env
+        python -c "import uvicorn; import importlib.util; spec = importlib.util.spec_from_file_location('main', 'main.py'); main = importlib.util.module_from_spec(spec); spec.loader.exec_module(main); print('Application loaded successfully')" 
